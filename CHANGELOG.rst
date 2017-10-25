@@ -1,3 +1,10 @@
+4.0.0
+=====
+
+Features
+--------
+* Asynchronous execution support in CQLEngine (PYTHON-605)
+
 3.12.0
 ======
 November 6, 2017
