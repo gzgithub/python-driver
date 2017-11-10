@@ -18,7 +18,7 @@ from itertools import count
 from cassandra.auth import PlainTextAuthProvider, SaslAuthProvider
 from cassandra.cluster import ConsistencyLevel, Cluster, DriverException, ExecutionProfile
 from cassandra.policies import ConstantSpeculativeExecutionPolicy
-from tests.integration.long.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
+from tests.integration.upgrade import UpgradeBase, UpgradeBaseAuth, UpgradePath, upgrade_paths
 
 try:
     import unittest2 as unittest
