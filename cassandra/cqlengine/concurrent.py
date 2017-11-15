@@ -78,7 +78,12 @@ class CQLEngineFuture(Future):
         """Callback handler for `ResponseFuture` type"""
         try:
             # _handle_result needs to be executed in another thread
-            self._handle_result()
+            if self._future.result().has_more_pages:
+                # When more pages have to be fetched for materialization,
+                # we cannot execute this in the main RF callback
+                self._future.session.cluster.executor.submit(self._handle_result)
+            else:
+                self._handle_result()
         except Exception as e:
             self.set_exception(e)
 

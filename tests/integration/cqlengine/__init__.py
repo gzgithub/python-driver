@@ -130,18 +130,34 @@ class MockResponseFuture(Future):
 
     _result = None
 
+    class MockSessionWithExecutor(object):
+
+        def __init__(self):
+            self.cluster = self
+            self.executor = self
+
+        def submit(self, fn, *args, **kwargs):
+            fn(*args, **kwargs)
+
+    class MockResultSet(object):
+        _result = []
+        has_more_pages = False
+
+        def __iter__(self):
+            return iter(self._result)
+
     def __init__(self):
         super(MockResponseFuture, self).__init__()
-        self._result = []
-        self.set_result(self._result)
+        self.set_result(MockResponseFuture.MockResultSet())
+        self.session = MockResponseFuture.MockSessionWithExecutor()
 
     def add_callback(self, fn, *args, **kwargs):
-        fn(*args, **kwargs)
+        fn(self._result, *args, **kwargs)
 
     def add_callbacks(self, callback, errback,
                       callback_args=(), callback_kwargs=None,
                       errback_args=(), errback_kwargs=None):
-        self.add_callback(callback, (self._result,)+callback_args, **(callback_kwargs or {}))
+        self.add_callback(callback, *callback_args, **(callback_kwargs or {}))
 
     def clear_callbacks(self):
         pass
