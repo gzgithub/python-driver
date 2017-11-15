@@ -773,7 +773,8 @@ class BaseModel(object):
                                    timeout=self._timeout,
                                    if_exists=self._if_exists).save_async()
 
-        def post_processing(_):
+        def post_processing(results):
+            query.check_applied(results)
             self._set_persisted()
             self._timestamp = None
             return self
@@ -838,7 +839,8 @@ class BaseModel(object):
                                    timeout=self._timeout,
                                    if_exists=self._if_exists).update_async()
 
-        def post_processing(_):
+        def post_processing(results):
+            query.check_applied(results)
             self._set_persisted()
             self._timestamp = None
             return self

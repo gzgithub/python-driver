@@ -256,7 +256,8 @@ class BatchQuery(object):
         future = conn.execute_async('\n'.join(query_list), parameters, self._consistency,
                                     timeout=self._timeout, connection=self._connection)
 
-        def post_processing(result):
+        def post_processing(results):
+            check_applied(results)
             self.queries = []
             self._execute_callbacks()
 
@@ -479,7 +480,7 @@ class AbstractQuerySet(object):
             raise CQLEngineException("Only inserts, updates, and deletes are available in batch mode")
 
         if self._result_cache is not None:
-            future = CQLEngineFuture(result=self._result_cache)
+            return CQLEngineFuture(result=self._result_cache)
         else:
             def fill_cache(results):
                 self._result_generator = (i for i in results)
@@ -493,10 +494,12 @@ class AbstractQuerySet(object):
 
                 return self._result_cache
 
-            post_processing = (fill_cache, post_processing) if post_processing else fill_cache
-            future = self._execute_async(self._select_query(), post_processing=post_processing)
+            def _post_processing(results):
+                results = fill_cache(results)
+                if post_processing:
+                    return post_processing(results)
 
-        return future
+            return self._execute_async(self._select_query(), post_processing=_post_processing)
 
     def _execute_query(self):
         return self._execute_query_async().result()
@@ -1652,7 +1655,13 @@ def _execute_statement_async(model, statement, consistency_level, timeout, conne
             s.keyspace = model._get_keyspace()
     connection = connection or model._get_connection()
     response_future = conn.execute_async(s, params, timeout=timeout, connection=connection)
-    return CQLEngineFuture(response_future, post_processing=post_processing)
+
+    def _post_processing(results):
+        check_applied(results)
+        if post_processing:
+            return post_processing(results)
+
+    return CQLEngineFuture(response_future, post_processing=_post_processing)
 
 
 def _execute_statement(model, statement, consistency_level, timeout, connection=None):

@@ -20,14 +20,13 @@ __all__ = ['CQLEngineFuture', 'CQLEngineFutureWaiter']
 
 class CQLEngineFuture(Future):
     """
-    CQLEngineFuture provides a `concurrent.futures.Future` implementation to
-    work with the internal of CQLEngine.
+    CQLEngineFuture provides a specialized `concurrent.futures.Future` that can wrap a `CQLEngineFuture` or a
+    `ResponseFuture` to work with the internal of CQLEngine.
     """
 
     _future = None
     _post_processing = None
     _result = None
-    _check_applied_fn = None
 
     def __init__(self, future=None, post_processing=None, result=None):
         super(CQLEngineFuture, self).__init__()
@@ -37,31 +36,21 @@ class CQLEngineFuture(Future):
             self.set_result(result)
         else:
             if post_processing:
-                self._post_processing = []
-                if isinstance(post_processing, (list, tuple)):
-                    self._post_processing += post_processing
-                else:
-                    self._post_processing.append(post_processing)
+                self._post_processing = post_processing
 
-            if isinstance(self._future, (CQLEngineFuture, CQLEngineFutureWaiter)):
-                self._future.add_done_callback(self._future_callback)
-            else:  # ResponseFuture
-                self._future.add_callbacks(self._response_future_callback, self._response_future_errback)
+            self._set_up_completion_callbacks()
 
-    @classmethod
-    def _check_applied(cls, results):
-        """CQLEngine LWT check"""
-        if cls._check_applied_fn is None:
-            from cassandra.cqlengine.query import check_applied
-            cls._check_applied_fn = staticmethod(check_applied)
-        cls._check_applied_fn(results)
+    def _set_up_completion_callbacks(self):
+        if isinstance(self._future, (CQLEngineFuture, CQLEngineFutureWaiter)):
+            self._future.add_done_callback(self._future_callback)
+        else:  # ResponseFuture
+            self._future.add_callbacks(self._response_future_callback, self._response_future_errback)
 
     def _execute_post_processing(self, results):
         """CQLEngine post-processing execution"""
         # Execute all post_processing functions
         if self._post_processing:
-            for fn in self._post_processing:
-                results = fn(results)
+            results = self._post_processing(results)
         return results
 
     def _future_callback(self, _):
@@ -77,7 +66,6 @@ class CQLEngineFuture(Future):
     def _response_future_callback(self, _):
         """Callback handler for `ResponseFuture` type"""
         try:
-            # _handle_result needs to be executed in another thread
             if self._future.result().has_more_pages:
                 # When more pages have to be fetched for materialization,
                 # we cannot execute this in the main RF callback
@@ -96,8 +84,7 @@ class CQLEngineFuture(Future):
         Handle a CQLEngine query result:
 
         1- Fetch and materialize all rows if the response future has_more_pages
-        2- Do LWT check
-        3- Execute internal cqlengine post_processing functions
+        2- Execute internal cqlengine post_processing functions
         """
         try:
             result_set = self._future.result()
@@ -105,10 +92,6 @@ class CQLEngineFuture(Future):
 
             # Ensure all rows are fetched and materialized.. important with fetch_size()
             results = list(result_set)
-
-            # LWT check if required
-            if len(results) == 1:  # avoid this check if not we know it's not a LWT
-                self._check_applied(results)
 
             results = self._execute_post_processing(results)
             self.set_result(results)
