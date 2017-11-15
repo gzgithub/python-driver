@@ -69,9 +69,9 @@ class CQLEngineFuture(Future):
             if self._future.result().has_more_pages:
                 # When more pages have to be fetched for materialization,
                 # we cannot execute this in the main RF callback
-                self._future.session.cluster.executor.submit(self._handle_result)
+                self._future.session.cluster.executor.submit(self._handle_response_future)
             else:
-                self._handle_result()
+                self._handle_response_future()
         except Exception as e:
             self.set_exception(e)
 
@@ -79,9 +79,9 @@ class CQLEngineFuture(Future):
         """Errback handler for `ResponseFuture` type"""
         self.set_exception(exc)
 
-    def _handle_result(self):
+    def _handle_response_future(self):
         """
-        Handle a CQLEngine query result:
+        Handle the result of a `ResponseFuture`:
 
         1- Fetch and materialize all rows if the response future has_more_pages
         2- Execute internal cqlengine post_processing functions
