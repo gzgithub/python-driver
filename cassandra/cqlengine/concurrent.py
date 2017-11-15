@@ -107,7 +107,7 @@ class CQLEngineFutureWaiter(Future):
 
     def __init__(self, futures):
         super(CQLEngineFutureWaiter, self).__init__()
-        self._futures = [future for future in futures if future is not None]
+        self._futures = futures
         self._count = len(self._futures)
 
         if self._futures:
